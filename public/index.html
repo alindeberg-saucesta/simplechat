@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Ollama Chatbot</title>
+    <style>
+        #chat {
+            height: 400px;
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin-bottom: 20px;
+            overflow-y: scroll;
+        }
+        .message {
+            margin-bottom: 10px;
+        }
+        .user {
+            font-weight: bold;
+            color: blue;
+        }
+        .bot {
+            font-weight: bold;
+            color: green;
+        }
+    </style>
+</head>
+<body>
+    <div id="chat"></div>
+    <form id="chatForm">
+        <input type="text" id="promptInput" placeholder="Type your message..." autocomplete="off">
+        <button type="submit">Send</button>
+    </form>
+
+    <script>
+    document.getElementById('chatForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const prompt = document.getElementById('promptInput').value.trim();
+        if (!prompt) return;
+
+        // Clear input
+        document.getElementById('promptInput').value = '';
+
+        // Append user message to chat window
+        const chatWindow = document.getElementById('chat');
+        const userMessage = document.createElement('div');
+        userMessage.textContent = `You: ${prompt}`;
+        userMessage.classList.add('message', 'user');
+        chatWindow.appendChild(userMessage);
+        chatWindow.scrollTop = chatWindow.scrollHeight;
+
+        // Make API request to server
+        const responseStream = await fetch('/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt })
+        });
+
+        const reader = responseStream.body.getReader();
+        const decoder = new TextDecoder();
+        let botMessageElement = document.createElement('div');
+        botMessageElement.classList.add('message', 'bot');
+        botMessageElement.textContent = 'Bot: ';
+        chatWindow.appendChild(botMessageElement);
+
+        while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            
+            const chunk = decoder.decode(value, { stream: true });
+
+            // Process JSON chunks
+            const lines = chunk.split('\n').filter(line => line.trim() !== '');
+            for (const line of lines) {
+                if (line.startsWith('data:')) {
+                    try {
+                        const json = JSON.parse(line.replace('data: ', ''));
+                        if (json.response) {
+                            botMessageElement.textContent += json.response;
+                            chatWindow.scrollTop = chatWindow.scrollHeight;
+                        }
+                    } catch (error) {
+                        console.error('Error parsing JSON:', error);
+                    }
+                }
+            }
+        }
+    });
+    </script>
+</body>
+</html>
