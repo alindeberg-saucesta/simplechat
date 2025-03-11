@@ -5,6 +5,7 @@ const cors = require('cors');
 const app = express();
 app.use(cors());
 app.use(express.json());
+app.use(express.static('public'));
 
 // Route for chatting with Ollama
 app.post('/api/chat', async (req, res) => {
